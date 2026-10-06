@@ -2,15 +2,19 @@
 
 import asyncio
 from collections.abc import Callable
+import html
 import logging
 from contextlib import suppress
 import os.path
+from urllib.parse import quote
 import uuid
 from datetime import timedelta
 from typing import Any
 
 import aiohttp
+from aiohttp import web
 import async_timeout
+from homeassistant.components.http import HomeAssistantView
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
@@ -56,6 +60,111 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.debug("loading moonraker init")
 
 _GCODE_ROOT = "gcodes"
+
+_UPLOAD_VIEW_URL = "/api/moonraker/gcode_upload"
+
+_UPLOAD_PAGE = """<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moonraker G-code Upload</title>
+  <style>
+    body {{ font-family: sans-serif; margin: 2rem auto; max-width: 32rem; padding: 0 1rem; }}
+    form {{ display: grid; gap: 1rem; }}
+    label {{ display: grid; gap: 0.25rem; }}
+    button {{ padding: 0.6rem 1rem; font-size: 1rem; }}
+    .msg {{ padding: 0.75rem; background: #e8f0fe; border-radius: 0.4rem; }}
+  </style>
+</head>
+<body>
+  <h1>Upload G-code</h1>
+  {message}
+  <form method="post" enctype="multipart/form-data">
+    <label>Printer
+      <select name="printer">{options}</select>
+    </label>
+    <label>G-code file
+      <input type="file" name="file" accept=".gcode,.g,.gco,.bgcode" required>
+    </label>
+    <label>
+      <input type="checkbox" name="start_print" value="1"> Start printing after upload
+    </label>
+    <button type="submit">Upload</button>
+  </form>
+</body>
+</html>"""
+
+_upload_view_registered = False
+
+
+class MoonrakerGcodeUploadView(HomeAssistantView):
+    """Serve a browser form that uploads gcode files to Moonraker."""
+
+    url = _UPLOAD_VIEW_URL
+    name = "api:moonraker:gcode_upload"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the upload view."""
+        self.hass = hass
+
+    def _coordinators(self) -> dict[str, "MoonrakerDataUpdateCoordinator"]:
+        """Return loaded moonraker coordinators keyed by entry id."""
+        return {
+            entry_id: coordinator
+            for entry_id, coordinator in self.hass.data.get(DOMAIN, {}).items()
+            if isinstance(coordinator, MoonrakerDataUpdateCoordinator)
+        }
+
+    async def get(self, request):
+        """Render the upload form."""
+        options = "".join(
+            f'<option value="{entry_id}">'
+            f"{html.escape(str(coordinator.api_device_name))}</option>"
+            for entry_id, coordinator in self._coordinators().items()
+        )
+        notice = request.query.get("notice", "")
+        message = f'<p class="msg">{html.escape(notice)}</p>' if notice else ""
+        return web.Response(
+            text=_UPLOAD_PAGE.format(options=options, message=message),
+            content_type="text/html",
+        )
+
+    async def post(self, request):
+        """Handle the uploaded file and forward it to Moonraker."""
+        entry_id = None
+        filename = None
+        data = b""
+        start_print = False
+
+        reader = await request.multipart()
+        async for part in reader:
+            if part.name == "file":
+                filename = part.filename
+                data = await part.read(decode=False)
+            elif part.name == "printer":
+                entry_id = (await part.text()).strip()
+            elif part.name == "start_print":
+                start_print = True
+
+        coordinator = self._coordinators().get(entry_id)
+        notice = "Select a gcode file to upload."
+        if coordinator is not None and data and filename:
+            filename = os.path.basename(filename.replace("\\", "/"))
+            try:
+                await coordinator.async_upload_gcode_data(data, filename)
+                if start_print:
+                    await coordinator.async_send_data(
+                        METHODS.PRINTER_PRINT_START, {"filename": filename}
+                    )
+                notice = f"Uploaded {filename}"
+                if start_print:
+                    notice += " and started the print"
+            except Exception:
+                _LOGGER.exception("Moonraker gcode upload failed")
+                notice = f"Upload of {filename} failed; see logs"
+
+        raise web.HTTPFound(f"{_UPLOAD_VIEW_URL}?notice={quote(notice)}")
 
 
 def _quiet_unreachable_logs(entry: ConfigEntry) -> bool:
@@ -415,6 +524,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.services.async_register(DOMAIN, "start_print", start_print_service)
     hass.services.async_register(DOMAIN, "upload_gcode", upload_gcode_service)
 
+    global _upload_view_registered
+    if not _upload_view_registered:
+        hass.http.register_view(MoonrakerGcodeUploadView(hass))
+        _upload_view_registered = True
+
     return True
 
 
@@ -726,7 +840,10 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
     async def async_upload_gcode(self, path: str) -> None:
         """Upload a gcode file to the printer via Moonraker's HTTP file API."""
         data = await self.hass.async_add_executor_job(_read_file_bytes, path)
-        filename = os.path.basename(path)
+        await self.async_upload_gcode_data(data, os.path.basename(path))
+
+    async def async_upload_gcode_data(self, data: bytes, filename: str) -> None:
+        """Upload raw gcode bytes to the printer via Moonraker's HTTP file API."""
         scheme = "https" if self.config_entry.data.get(CONF_TLS, False) else "http"
         api_url = (
             f"{scheme}://{self.config_entry.data.get(CONF_URL)}:"

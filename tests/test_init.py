@@ -1498,3 +1498,30 @@ async def test_refresh_files_updates_file_list(hass):
 
     assert coordinator.data["file_list"] == {"files": [{"path": "a.gcode"}]}
     coordinator.async_update_listeners.assert_called_once()
+
+
+async def test_upload_gcode_data_posts_to_http_api(hass):
+    """async_upload_gcode_data posts a multipart form and refreshes files."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="updata")
+    coordinator = MoonrakerDataUpdateCoordinator(
+        hass, client=MagicMock(), config_entry=config_entry, api_device_name="printer"
+    )
+    coordinator.async_refresh_files = AsyncMock()
+
+    response = MagicMock()
+    post_cm = MagicMock()
+    post_cm.__aenter__ = AsyncMock(return_value=response)
+    post_cm.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.post = MagicMock(return_value=post_cm)
+
+    with patch(
+        "custom_components.moonraker.async_get_clientsession",
+        return_value=session,
+    ):
+        await coordinator.async_upload_gcode_data(b"G28\n", "benchy.gcode")
+
+    session.post.assert_called_once()
+    call_args, call_kwargs = session.post.call_args
+    assert call_args[0].endswith("/server/files/upload")
+    coordinator.async_refresh_files.assert_awaited_once()
