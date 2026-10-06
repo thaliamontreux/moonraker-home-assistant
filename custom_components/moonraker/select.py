@@ -4,6 +4,7 @@ from homeassistant.components.select import SelectEntity
 
 from .const import DOMAIN, METHODS, SLOW_UPDATE_CYCLES
 from .entity import BaseMoonrakerEntity
+from custom_components.moonraker.__init__ import _normalize_file_list
 
 
 async def _files_updater(coordinator):
@@ -11,7 +12,7 @@ async def _files_updater(coordinator):
     files = await coordinator.async_fetch_data(
         METHODS.SERVER_FILES_LIST, {"root": "gcodes"}, quiet=True
     )
-    return {"file_list": files}
+    return {"file_list": _normalize_file_list(files)}
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -38,7 +39,8 @@ class MoonrakerFileSelect(BaseMoonrakerEntity, SelectEntity):
     @property
     def options(self) -> list[str]:
         """Return the stored gcode filenames."""
-        files = ((self.coordinator.data or {}).get("file_list") or {}).get("files")
+        file_list = (self.coordinator.data or {}).get("file_list") or {}
+        files = file_list.get("files") if isinstance(file_list, dict) else file_list
         if not isinstance(files, list):
             return []
         return sorted(

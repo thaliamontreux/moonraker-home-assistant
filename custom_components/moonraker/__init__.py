@@ -94,6 +94,15 @@ def _entry_polling_interval(entry: ConfigEntry) -> timedelta:
     return timedelta(seconds=max(polling_rate, MIN_POLLING_RATE))
 
 
+def _normalize_file_list(files: Any) -> dict[str, Any]:
+    """Normalize server.files.list replies to a dict with a ``files`` key."""
+    if isinstance(files, list):
+        return {"files": files}
+    if isinstance(files, dict):
+        return files
+    return {"files": []}
+
+
 def _read_file_bytes(path: str) -> bytes:
     """Read a file from disk; intended to run in the executor."""
     with open(path, "rb") as file:
@@ -710,7 +719,7 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
             METHODS.SERVER_FILES_LIST, {"root": _GCODE_ROOT}, quiet=True
         )
         current_data = dict(self.data or {})
-        current_data["file_list"] = files
+        current_data["file_list"] = _normalize_file_list(files)
         self.data = current_data
         self.async_update_listeners()
 
