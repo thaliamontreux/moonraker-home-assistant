@@ -78,6 +78,7 @@ _UPLOAD_PAGE = """<!doctype html>
 </head>
 <body>
   <h1>Upload G-code</h1>
+  <p><a href="/api/moonraker/panel">Open the live control deck</a></p>
   {message}
   <form method="post" enctype="multipart/form-data">
     <label>Printer
@@ -526,7 +527,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     global _upload_view_registered
     if not _upload_view_registered:
+        from .panel import register_panel_views
+
         hass.http.register_view(MoonrakerGcodeUploadView(hass))
+        register_panel_views(hass)
         _upload_view_registered = True
 
     return True
