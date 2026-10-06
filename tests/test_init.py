@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from custom_components.moonraker.const import PRINTSTATES
 
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
@@ -1437,3 +1437,64 @@ async def test_polling_interval_uses_per_entry_option(hass, get_data):
         get_data["status"]["print_stats"]["state"] = PRINTSTATES.STANDBY.value
         await coordinator._async_update_data()
         assert coordinator.update_interval == timedelta(seconds=45)
+
+
+async def test_start_print_service(hass):
+    """The start_print service should send printer.print.start."""
+    config_entry = MockConfigEntry(
+        domain=DOMAIN, data=MOCK_CONFIG, entry_id="start_print"
+    )
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device_id = list(hass.data["device_registry"].devices.keys())
+
+    with patch(
+        "moonraker_api.MoonrakerClient.call_method", new_callable=AsyncMock
+    ) as mock_call:
+        await hass.services.async_call(
+            DOMAIN,
+            "start_print",
+            {"device_id": device_id, "filename": "benchy.gcode"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+        mock_call.assert_awaited_once_with(
+            METHODS.PRINTER_PRINT_START.value, filename="benchy.gcode"
+        )
+
+
+async def test_upload_gcode_rejects_unlisted_path(hass):
+    """upload_gcode refuses paths outside allowlisted directories."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="upload")
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device_id = list(hass.data["device_registry"].devices.keys())
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            DOMAIN,
+            "upload_gcode",
+            {"device_id": device_id, "path": "/etc/passwd"},
+            blocking=True,
+        )
+
+
+async def test_refresh_files_updates_file_list(hass):
+    """async_refresh_files stores the file list and notifies listeners."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="files")
+    coordinator = MoonrakerDataUpdateCoordinator(
+        hass, client=MagicMock(), config_entry=config_entry, api_device_name="printer"
+    )
+    coordinator._async_fetch_data = AsyncMock(
+        return_value={"files": [{"path": "a.gcode"}]}
+    )
+    coordinator.async_update_listeners = MagicMock()
+
+    await coordinator.async_refresh_files()
+
+    assert coordinator.data["file_list"] == {"files": [{"path": "a.gcode"}]}
+    coordinator.async_update_listeners.assert_called_once()

@@ -6,6 +6,7 @@ import pytest
 from homeassistant.components.button.const import DOMAIN as BUTTON_DOMAIN
 from homeassistant.components.button.const import SERVICE_PRESS
 from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -234,4 +235,52 @@ async def test_home_axis_buttons(hass, button, gcode):
         await hass.async_block_till_done()
         mock_api.assert_called_once_with(
             METHODS.PRINTER_GCODE_SCRIPT.value, script=gcode
+        )
+
+
+async def test_print_selected_file_button(hass):
+    """The print selected file button starts the chosen file."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator.selected_file = "benchy.gcode"
+
+    entity_id = "button.mainsail_print_selected_file"
+    await _enable_button_entity(hass, config_entry, entity_id)
+
+    with patch("moonraker_api.MoonrakerClient.call_method") as mock_api:
+        await hass.services.async_call(
+            BUTTON_DOMAIN,
+            SERVICE_PRESS,
+            {ATTR_ENTITY_ID: entity_id},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+        mock_api.assert_called_once_with(
+            METHODS.PRINTER_PRINT_START.value, filename="benchy.gcode"
+        )
+
+
+async def test_print_selected_file_requires_selection(hass):
+    """Pressing print selected without a chosen file raises an error."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator.selected_file = None
+
+    entity_id = "button.mainsail_print_selected_file"
+    await _enable_button_entity(hass, config_entry, entity_id)
+
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            BUTTON_DOMAIN,
+            SERVICE_PRESS,
+            {ATTR_ENTITY_ID: entity_id},
+            blocking=True,
         )

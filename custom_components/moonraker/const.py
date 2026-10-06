@@ -19,6 +19,7 @@ PLATFORMS = [
     Platform.SWITCH,
     Platform.NUMBER,
     Platform.LIGHT,
+    Platform.SELECT,
 ]
 
 CONF_API_KEY = "api_key"
@@ -70,6 +71,7 @@ class METHODS(Enum):
     MACHINE_SYSTEM_INFO = "machine.system_info"
     PRINTER_EMERGENCY_STOP = "printer.emergency_stop"
     PRINTER_INFO = "printer.info"
+    PRINTER_PRINT_START = "printer.print.start"
     PRINTER_GCODE_HELP = "printer.gcode.help"
     PRINTER_GCODE_SCRIPT = "printer.gcode.script"
     PRINTER_OBJECTS_LIST = "printer.objects.list"
@@ -79,6 +81,7 @@ class METHODS(Enum):
     PRINTER_PRINT_PAUSE = "printer.print.pause"
     PRINTER_PRINT_RESUME = "printer.print.resume"
     PRINTER_FIRMWARE_RESTART = "printer.firmware_restart"
+    SERVER_FILES_LIST = "server.files.list"
     SERVER_FILES_METADATA = "server.files.metadata"
     SERVER_HISTORY_TOTALS = "server.history.totals"
     SERVER_HISTORY_RESET_TOTALS = "server.history.reset_totals"

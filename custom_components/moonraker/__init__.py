@@ -9,10 +9,11 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
+import aiohttp
 import async_timeout
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.typing import ConfigType
@@ -91,6 +92,66 @@ def _entry_polling_interval(entry: ConfigEntry) -> timedelta:
     except (TypeError, ValueError):
         polling_rate = DEFAULT_POLLING_RATE
     return timedelta(seconds=max(polling_rate, MIN_POLLING_RATE))
+
+
+def _read_file_bytes(path: str) -> bytes:
+    """Read a file from disk; intended to run in the executor."""
+    with open(path, "rb") as file:
+        return file.read()
+
+
+def _async_resolve_entry_ids(
+    hass: HomeAssistant, raw_device_ids: Any
+) -> list[str]:
+    """Resolve service device selectors into loaded moonraker entry ids."""
+    dev_reg = dr.async_get(hass)
+    domain_entries = hass.data.get(DOMAIN, {})
+
+    if isinstance(raw_device_ids, str):
+        device_ids = [raw_device_ids]
+    else:
+        device_ids = list(raw_device_ids)
+
+    resolved: list[str] = []
+
+    for device_id in device_ids:
+        device = dev_reg.async_get(device_id)
+        entry_ids: set[str] = set()
+
+        if device is None:
+            if device_id in domain_entries:
+                entry_ids.add(device_id)
+            else:
+                _LOGGER.warning("Unknown Moonraker device_id %s", device_id)
+                continue
+        else:
+            if getattr(device, "config_entries", None):
+                entry_ids.update(device.config_entries)
+            if device.primary_config_entry:
+                entry_ids.add(device.primary_config_entry)
+            if not entry_ids:
+                for domain, identifier in device.identifiers:
+                    if domain == DOMAIN:
+                        entry_ids.add(identifier)
+
+        if not entry_ids:
+            _LOGGER.warning(
+                "Moonraker device %s has no associated config entries", device_id
+            )
+            continue
+
+        for entry_id in entry_ids:
+            if entry_id not in domain_entries:
+                _LOGGER.warning(
+                    "Moonraker device %s entry %s not loaded",
+                    device_id,
+                    entry_id,
+                )
+                continue
+            if entry_id not in resolved:
+                resolved.append(entry_id)
+
+    return resolved
 
 
 async def _async_is_tcp_reachable(host: str, port: int | str | None) -> bool:
@@ -293,8 +354,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async def send_gcode_service(service_call):
         """Handle the service call to send g-code."""
         gcode = service_call.data["gcode"]
-        raw_device_ids = service_call.data["device_id"]
-        dev_reg = dr.async_get(hass)
 
         if isinstance(gcode, list):
             script = "\n".join(line for line in gcode if line)
@@ -305,66 +364,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.warning("Received empty G-code payload, skipping send")
             return
 
-        if isinstance(raw_device_ids, str):
-            device_ids = [raw_device_ids]
-        else:
-            device_ids = list(raw_device_ids)
+        for entry_id in _async_resolve_entry_ids(
+            hass, service_call.data["device_id"]
+        ):
+            _LOGGER.debug("Sending G-code via entry %s", entry_id)
+            await hass.data[DOMAIN][entry_id].async_send_data(
+                METHODS.PRINTER_GCODE_SCRIPT,
+                {"script": script},
+            )
 
-        processed_entries: set[str] = set()
+    async def start_print_service(service_call):
+        """Handle the service call to start printing a stored file."""
+        filename = str(service_call.data.get("filename") or "").strip()
+        if not filename:
+            raise HomeAssistantError("A filename is required to start a print")
 
-        domain_entries = hass.data.get(DOMAIN, {})
+        for entry_id in _async_resolve_entry_ids(
+            hass, service_call.data["device_id"]
+        ):
+            await hass.data[DOMAIN][entry_id].async_send_data(
+                METHODS.PRINTER_PRINT_START,
+                {"filename": filename},
+            )
 
-        for device_id in device_ids:
-            device = dev_reg.async_get(device_id)
-            entry_ids: set[str] = set()
+    async def upload_gcode_service(service_call):
+        """Handle the service call to upload a gcode file to the printer."""
+        path = str(service_call.data.get("path") or "").strip()
+        if not path or not hass.config.is_allowed_path(path):
+            raise HomeAssistantError(
+                f"Upload path {path!r} is not allowed; add its directory to "
+                "allowlist_external_dirs"
+            )
 
-            if device is None:
-                if device_id in domain_entries:
-                    entry_ids.add(device_id)
-                else:
-                    _LOGGER.warning("Unknown Moonraker device_id %s", device_id)
-                    continue
-            else:
-                if getattr(device, "config_entries", None):
-                    entry_ids.update(device.config_entries)
-                if device.primary_config_entry:
-                    entry_ids.add(device.primary_config_entry)
-                if not entry_ids:
-                    for domain, identifier in device.identifiers:
-                        if domain == DOMAIN:
-                            entry_ids.add(identifier)
-
-            if not entry_ids:
-                _LOGGER.warning(
-                    "Moonraker device %s has no associated config entries", device_id
-                )
-                continue
-
-            for entry_id in entry_ids:
-                if entry_id not in hass.data.get(DOMAIN, {}):
-                    _LOGGER.warning(
-                        "Moonraker device %s entry %s not loaded",
-                        device_id,
-                        entry_id,
-                    )
-                    continue
-
-                if entry_id in processed_entries:
-                    continue
-
-                processed_entries.add(entry_id)
-
-                _LOGGER.debug(
-                    "Sending G-code via entry %s for device %s", entry_id, device_id
-                )
-
-                await hass.data[DOMAIN][entry_id].async_send_data(
-                    METHODS.PRINTER_GCODE_SCRIPT,
-                    {"script": script},
-                )
+        for entry_id in _async_resolve_entry_ids(
+            hass, service_call.data["device_id"]
+        ):
+            await hass.data[DOMAIN][entry_id].async_upload_gcode(path)
 
     # Register the new service
     hass.services.async_register(DOMAIN, "send_gcode", send_gcode_service)
+    hass.services.async_register(DOMAIN, "start_print", start_print_service)
+    hass.services.async_register(DOMAIN, "upload_gcode", upload_gcode_service)
 
     return True
 
@@ -422,6 +462,7 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
         self._gcode_metadata_cache: dict[str, Any] | None = None
         self._subscribed_to_status = False
         self._push_unsub: Callable[[], None] | None = None
+        self.selected_file: str | None = None
         self._updater_every: dict[Any, int] = {}
         self._update_cycle = 0
         client.notification_handler = self._async_handle_notification
@@ -662,6 +703,41 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
     def set_initial_data(self, key: str, value: Any) -> None:
         """Add setup-time data without triggering a full coordinator refresh."""
         self.data = {**(self.data or {}), key: value}
+
+    async def async_refresh_files(self) -> None:
+        """Refresh the stored gcode file list and notify entities."""
+        files = await self._async_fetch_data(
+            METHODS.SERVER_FILES_LIST, {"root": _GCODE_ROOT}, quiet=True
+        )
+        current_data = dict(self.data or {})
+        current_data["file_list"] = files
+        self.data = current_data
+        self.async_update_listeners()
+
+    async def async_upload_gcode(self, path: str) -> None:
+        """Upload a gcode file to the printer via Moonraker's HTTP file API."""
+        data = await self.hass.async_add_executor_job(_read_file_bytes, path)
+        filename = os.path.basename(path)
+        scheme = "https" if self.config_entry.data.get(CONF_TLS, False) else "http"
+        api_url = (
+            f"{scheme}://{self.config_entry.data.get(CONF_URL)}:"
+            f"{_entry_port(self.config_entry)}/server/files/upload"
+        )
+        form = aiohttp.FormData()
+        form.add_field("root", _GCODE_ROOT)
+        form.add_field(
+            "file", data, filename=filename, content_type="application/octet-stream"
+        )
+        api_key = self.config_entry.data.get(CONF_API_KEY)
+        headers = {"X-Api-Key": api_key} if api_key else {}
+        session = async_get_clientsession(self.hass, verify_ssl=False)
+        async with (
+            async_timeout.timeout(TIMEOUT),
+            session.post(api_url, data=form, headers=headers) as response,
+        ):
+            response.raise_for_status()
+        _LOGGER.info("Uploaded %s to Moonraker", filename)
+        await self.async_refresh_files()
 
     async def _async_fetch_objects(
         self, query_objects: dict[str, Any] | None = None, quiet: bool = False

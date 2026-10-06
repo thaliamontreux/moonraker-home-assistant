@@ -40,6 +40,7 @@ async def async_setup_entry(hass, entry, async_add_devices):
     await async_setup_output_pin(coordinator, entry, async_add_devices)
     await async_setup_temperature_target(coordinator, entry, async_add_devices)
     await async_setup_speed_factor(coordinator, entry, async_add_devices)
+    await async_setup_flow_rate(coordinator, entry, async_add_devices)
     await async_setup_fan_speed(coordinator, entry, async_add_devices)
 
 
@@ -202,6 +203,33 @@ async def async_setup_speed_factor(coordinator, entry, async_add_entities):
         unit=PERCENTAGE,
         update_code="M220 S",
         max_value=200,
+    )
+
+    coordinator.load_sensor_data([desc])
+    await coordinator.async_refresh_query_data()
+    async_add_entities(
+        [MoonrakerNumber(coordinator, entry, desc, value_multiplier=100.0)]
+    )
+
+
+async def async_setup_flow_rate(coordinator, entry, async_add_entities):
+    """Set up flow rate number entity."""
+
+    object_list = await coordinator.async_get_printer_objects()
+    if "gcode_move" not in object_list["objects"]:
+        return
+
+    desc = MoonrakerNumberSensorDescription(
+        key="flow_rate",
+        sensor_name="gcode_move",
+        name="Flow Rate",
+        status_key="extrude_factor",
+        subscriptions=[("gcode_move", "extrude_factor")],
+        icon="mdi:chart-line",
+        unit=PERCENTAGE,
+        update_code="M221 S",
+        max_value=200,
+        min_value=1,
     )
 
     coordinator.load_sensor_data([desc])

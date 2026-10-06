@@ -5,9 +5,20 @@ from dataclasses import dataclass
 
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, METHODS
 from .entity import BaseMoonrakerEntity
+
+
+async def _async_print_selected_file(button):
+    """Start printing the file chosen in the select entity."""
+    filename = getattr(button.coordinator, "selected_file", None)
+    if not filename:
+        raise HomeAssistantError("Select a file to print first")
+    await button.coordinator.async_send_data(
+        METHODS.PRINTER_PRINT_START, {"filename": filename}
+    )
 
 
 @dataclass(frozen=True)
@@ -108,6 +119,13 @@ BUTTONS: tuple[MoonrakerButtonDescription, ...] = (
             METHODS.SERVER_HISTORY_RESET_TOTALS
         ),
         icon="mdi:history",
+    ),
+    MoonrakerButtonDescription(
+        key="print_selected_file",
+        name="Print Selected File",
+        press_fn=_async_print_selected_file,
+        icon="mdi:file-play-outline",
+        entity_registry_enabled_default=True,
     ),
     MoonrakerButtonDescription(
         key="start_print_from_queue",
