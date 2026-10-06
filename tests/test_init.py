@@ -41,6 +41,7 @@ from custom_components.moonraker.const import (
     DEFAULT_PORT,
     DOMAIN,
     METHODS,
+    NOTIFY_GCODE_RESPONSE,
     NOTIFY_KLIPPY_DISCONNECTED,
     NOTIFY_KLIPPY_READY,
     NOTIFY_KLIPPY_SHUTDOWN,
@@ -1525,3 +1526,18 @@ async def test_upload_gcode_data_posts_to_http_api(hass):
     call_args, call_kwargs = session.post.call_args
     assert call_args[0].endswith("/server/files/upload")
     coordinator.async_refresh_files.assert_awaited_once()
+
+
+async def test_gcode_response_buffered(hass):
+    """notify_gcode_response should be buffered for the console."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="gcr")
+    coordinator = MoonrakerDataUpdateCoordinator(
+        hass, client=MagicMock(), config_entry=config_entry, api_device_name="printer"
+    )
+
+    await coordinator._async_handle_notification(
+        NOTIFY_GCODE_RESPONSE, ["// T0:210.0 /210.0"]
+    )
+    await coordinator._async_handle_notification(NOTIFY_GCODE_RESPONSE, ["ok"])
+
+    assert list(coordinator.gcode_responses) == ["// T0:210.0 /210.0", "ok"]

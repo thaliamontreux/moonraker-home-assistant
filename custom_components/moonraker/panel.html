@@ -6,345 +6,418 @@
 <title>🛸 moonraker // control deck</title>
 <style>
   :root {
-    --neon-pink: #ff2fd6;
-    --neon-cyan: #00f5d4;
-    --neon-lime: #ccff00;
-    --neon-orange: #ff9f1c;
-    --neon-violet: #8a2bff;
+    --neon-pink: #ff2fd6; --neon-cyan: #00f5d4; --neon-lime: #ccff00;
+    --neon-orange: #ff9f1c; --neon-violet: #8a2bff;
     --ink: #241d2b;
-    --pastel-pink: #ffe3f4;
-    --pastel-mint: #d9fbe8;
-    --pastel-sky: #dcefff;
-    --pastel-butter: #fff6c9;
-    --pastel-lilac: #efe1ff;
-    --pastel-peach: #ffe9d6;
+    --pastel-pink: #ffe3f4; --pastel-mint: #d9fbe8; --pastel-sky: #dcefff;
+    --pastel-butter: #fff6c9; --pastel-lilac: #efe1ff; --pastel-peach: #ffe9d6;
     --card: #fffdf8;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0;
+    margin: 0; color: var(--ink);
     font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    color: var(--ink);
-    background: #fdf3ff;
-    min-height: 100vh;
-    overflow-x: hidden;
-    position: relative;
+    background: #fdf3ff; min-height: 100vh; overflow-x: hidden;
   }
-  /* pastel cyber blobs */
   body::before {
-    content: "";
-    position: fixed; inset: -10%;
+    content: ""; position: fixed; inset: -10%; z-index: -2;
     background:
       radial-gradient(circle at 15% 20%, var(--pastel-pink) 0 18%, transparent 35%),
       radial-gradient(circle at 85% 15%, var(--pastel-sky) 0 20%, transparent 40%),
       radial-gradient(circle at 25% 85%, var(--pastel-mint) 0 22%, transparent 42%),
       radial-gradient(circle at 80% 80%, var(--pastel-butter) 0 18%, transparent 38%),
       radial-gradient(circle at 55% 45%, var(--pastel-lilac) 0 15%, transparent 35%);
-    z-index: -2;
   }
-  /* scanlines */
   body::after {
-    content: "";
-    position: fixed; inset: 0; pointer-events: none; z-index: 50;
-    background: repeating-linear-gradient(
-      0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px);
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px);
     mix-blend-mode: multiply;
   }
   header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 1rem; padding: 0.9rem 1.4rem; flex-wrap: wrap;
-    background: var(--ink); color: var(--neon-cyan);
-    border-bottom: 4px solid var(--neon-pink);
+    display: flex; align-items: center; gap: .8rem; padding: .8rem 1.4rem;
+    background: var(--ink); color: var(--neon-cyan); flex-wrap: wrap;
+    border-bottom: 4px solid var(--neon-pink); z-index: 40; position: sticky; top: 0;
     font-family: "Courier New", ui-monospace, monospace;
-    position: sticky; top: 0; z-index: 40;
   }
-  header h1 {
-    margin: 0; font-size: 1.15rem; letter-spacing: .12em;
-    text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(0,245,212,.5);
-    white-space: nowrap;
-  }
-  .statechip {
-    padding: .25rem .8rem; border-radius: 999px; font-weight: 700;
+  header h1 { margin: 0; font-size: 1.05rem; letter-spacing: .12em; white-space: nowrap;
+    text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(0,245,212,.5); }
+  .zone-tag { font-size: .65rem; letter-spacing: .3em; opacity: .6; }
+  .statechip { padding: .25rem .8rem; border-radius: 999px; font-weight: 700;
     border: 2px solid var(--neon-lime); color: var(--neon-lime);
-    text-shadow: 0 0 8px rgba(204,255,0,.7); letter-spacing: .15em;
-    text-transform: uppercase; font-size: .8rem;
-  }
+    text-transform: uppercase; font-size: .75rem; letter-spacing: .15em;
+    text-shadow: 0 0 8px rgba(204,255,0,.7); }
   .statechip.bad { border-color: var(--neon-pink); color: var(--neon-pink); }
-  .ticker {
-    overflow: hidden; white-space: nowrap;
-    background: var(--neon-lime); color: var(--ink);
-    border-bottom: 4px solid var(--neon-pink);
+  .kchip { padding: .2rem .7rem; border-radius: 999px; font-size: .7rem;
+    border: 2px solid var(--neon-violet); color: var(--neon-violet); letter-spacing: .1em; }
+  .ticker { overflow: hidden; white-space: nowrap; background: var(--neon-lime);
+    color: var(--ink); border-bottom: 4px solid var(--neon-pink);
     font-family: "Courier New", monospace; font-weight: 700;
-    padding: .35rem 0; letter-spacing: .08em;
-  }
-  .ticker span { display: inline-block; padding-left: 100%;
-    animation: tick 28s linear infinite; }
+    padding: .3rem 0; letter-spacing: .08em; font-size: .8rem; }
+  .ticker span { display: inline-block; padding-left: 100%; animation: tick 30s linear infinite; }
   @keyframes tick { to { transform: translateX(-100%); } }
 
-  .deck {
-    display: grid; gap: 1.4rem; padding: 1.6rem;
-    grid-template-columns: repeat(12, 1fr);
-    max-width: 1280px; margin: 0 auto;
-  }
-  .card {
-    background: var(--card);
-    border: 3px solid var(--ink);
-    border-radius: 14px;
-    padding: 1rem 1.2rem;
-    position: relative;
-    box-shadow: 7px 7px 0 var(--neon-cyan);
-  }
-  .card h2 {
-    margin: 0 0 .8rem; font-family: "Courier New", monospace;
-    font-size: .85rem; letter-spacing: .2em; text-transform: uppercase;
-    display: inline-block; background: var(--ink); color: #fff;
-    padding: .15rem .7rem; border-radius: 6px;
-  }
-  .c-pink   { box-shadow: 7px 7px 0 var(--neon-pink); }
-  .c-lime   { box-shadow: 7px 7px 0 var(--neon-lime); }
-  .c-violet { box-shadow: 7px 7px 0 var(--neon-violet); }
-  .c-orange { box-shadow: 7px 7px 0 var(--neon-orange); }
-  .c-cyan   { box-shadow: 7px 7px 0 var(--neon-cyan); }
-  .tilt-l { transform: rotate(-1deg); }
-  .tilt-r { transform: rotate(1deg); }
-  .span4 { grid-column: span 4; }
-  .span5 { grid-column: span 5; }
-  .span6 { grid-column: span 6; }
-  .span7 { grid-column: span 7; }
-  .span8 { grid-column: span 8; }
-  .span12 { grid-column: span 12; }
-  @media (max-width: 960px) {
-    .span4,.span5,.span6,.span7,.span8 { grid-column: span 12; }
-    .tilt-l,.tilt-r { transform: none; }
-  }
+  .deck { display: grid; gap: 1.3rem; padding: 1.4rem;
+    grid-template-columns: repeat(12, 1fr); max-width: 1500px; margin: 0 auto; }
+  .zone { display: grid; gap: 1.3rem; align-content: start; }
+  .z1 { grid-column: span 4; } .z2 { grid-column: span 4; } .z3 { grid-column: span 4; }
+  .z4 { grid-column: span 12; }
+  @media (max-width: 1080px) { .z1,.z2,.z3 { grid-column: span 12; } }
+  .zone-h { font-family: "Courier New", monospace; font-weight: 800; font-size: .75rem;
+    letter-spacing: .35em; text-transform: uppercase; padding: .2rem .8rem;
+    display: inline-block; transform: rotate(-1deg); width: max-content; }
+  .z1 .zone-h { background: var(--neon-pink); }
+  .z2 .zone-h { background: var(--neon-cyan); }
+  .z3 .zone-h { background: var(--neon-violet); color: #fff; }
+  .z4 > .zone-h { background: var(--neon-orange); }
 
-  .ringwrap { display: flex; gap: 1.2rem; align-items: center; }
+  .card { background: var(--card); border: 3px solid var(--ink); border-radius: 14px;
+    padding: .9rem 1.1rem; position: relative; }
+  .card h2 { margin: 0 0 .7rem; font-family: "Courier New", monospace; font-size: .8rem;
+    letter-spacing: .2em; text-transform: uppercase; display: inline-block;
+    background: var(--ink); color: #fff; padding: .15rem .7rem; border-radius: 6px; }
+  .z1 .card { box-shadow: 6px 6px 0 var(--neon-pink); }
+  .z2 .card { box-shadow: 6px 6px 0 var(--neon-cyan); }
+  .z3 .card { box-shadow: 6px 6px 0 var(--neon-violet); }
+  .z4 .card { box-shadow: 6px 6px 0 var(--neon-orange); }
+  .tilt-l { transform: rotate(-.7deg); } .tilt-r { transform: rotate(.7deg); }
+  @media (max-width: 1080px) { .tilt-l,.tilt-r { transform: none; } }
+
+  .ringwrap { display: flex; gap: 1rem; align-items: center; }
   .ring { transform: rotate(-90deg); }
   .ring .bg { stroke: #efe7f5; }
-  .ring .fg {
-    stroke: url(#grad); stroke-linecap: round;
+  .ring .fg { stroke: url(#grad); stroke-linecap: round;
     transition: stroke-dashoffset .6s ease;
-    filter: drop-shadow(0 0 6px rgba(255,47,214,.6));
-  }
-  .pct { font-size: 2.4rem; font-weight: 800;
-    font-family: "Courier New", monospace; }
-  .thumb {
-    width: 130px; height: 130px; object-fit: contain;
-    border: 3px solid var(--neon-violet); border-radius: 10px;
-    background: var(--pastel-lilac); image-rendering: auto;
-  }
-  .fname {
-    font-family: "Courier New", monospace; font-weight: 700;
-    word-break: break-all; font-size: 1rem;
-    background: var(--pastel-butter); padding: .3rem .6rem;
-    border: 2px dashed var(--neon-orange); border-radius: 8px;
-    margin: .4rem 0;
-  }
-  .kv { display: grid; grid-template-columns: auto 1fr; gap: .25rem 1rem;
-    font-family: "Courier New", monospace; font-size: .9rem; }
-  .kv b { text-align: right; }
-  .kv span { text-align: left; }
+    filter: drop-shadow(0 0 6px rgba(255,47,214,.6)); }
+  .pct { font-size: 2rem; font-weight: 800; font-family: "Courier New", monospace; }
+  .thumb { width: 110px; height: 110px; object-fit: contain;
+    border: 3px solid var(--neon-violet); border-radius: 10px; background: var(--pastel-lilac); }
+  .fname { font-family: "Courier New", monospace; font-weight: 700; word-break: break-all;
+    font-size: .9rem; background: var(--pastel-butter); padding: .3rem .6rem;
+    border: 2px dashed var(--neon-orange); border-radius: 8px; margin: .4rem 0; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem;
+    font-family: "Courier New", monospace; font-size: .82rem; }
+  .kv b { text-align: right; } .kv span { text-align: left; }
+  .layerbar { height: .9rem; background: #f0e8f6; border: 2px solid var(--ink);
+    border-radius: 6px; overflow: hidden; margin-top: .5rem; }
+  .layerbar > i { display: block; height: 100%;
+    background: repeating-linear-gradient(45deg, var(--neon-cyan) 0 10px, var(--neon-lime) 10px 20px); }
 
-  .bar { height: 1.6rem; background: #f0e8f6; border: 2px solid var(--ink);
-    border-radius: 8px; overflow: hidden; position: relative; }
-  .bar > i {
-    display: block; height: 100%;
-    background: repeating-linear-gradient(45deg,
-      var(--neon-pink) 0 12px, var(--neon-violet) 12px 24px);
-    transition: width .5s ease;
-  }
-  .bar > em { position: absolute; inset: 0; display: grid; place-items: center;
-    font-style: normal; font-weight: 700; font-size: .78rem;
-    font-family: "Courier New", monospace; }
-  .bar.cool > i { background: repeating-linear-gradient(45deg,
-      var(--neon-cyan) 0 12px, #7df 12px 24px); }
-
-  .btnrow { display: flex; flex-wrap: wrap; gap: .7rem; }
-  button {
-    font-family: "Courier New", monospace; font-weight: 800;
-    letter-spacing: .08em; text-transform: uppercase;
-    border: 3px solid var(--ink); border-radius: 10px;
-    padding: .55rem 1.1rem; cursor: pointer; font-size: .85rem;
-    background: var(--pastel-mint);
-    box-shadow: 4px 4px 0 var(--ink);
-    transition: transform .08s, box-shadow .08s;
-  }
-  button:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--ink); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: .55rem; }
+  button { font-family: "Courier New", monospace; font-weight: 800; font-size: .78rem;
+    letter-spacing: .06em; text-transform: uppercase; border: 3px solid var(--ink);
+    border-radius: 10px; padding: .45rem .85rem; cursor: pointer;
+    background: var(--pastel-mint); box-shadow: 3px 3px 0 var(--ink);
+    transition: transform .08s, box-shadow .08s; }
+  button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
   button.b-pink { background: var(--pastel-pink); }
   button.b-sky { background: var(--pastel-sky); }
   button.b-butter { background: var(--pastel-butter); }
-  button.b-danger { background: #ffd6d6; border-color: #c00;
-    box-shadow: 4px 4px 0 #c00; }
+  button.b-lilac { background: var(--pastel-lilac); }
+  button.b-peach { background: var(--pastel-peach); }
+  button.b-danger { background: #ffd6d6; border-color: #c00; box-shadow: 3px 3px 0 #c00; }
+  button.sm { padding: .3rem .6rem; font-size: .68rem; border-width: 2px; box-shadow: 2px 2px 0 var(--ink); }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  button.on { background: var(--neon-lime); }
 
-  .slider-block { margin: .7rem 0; }
-  .slider-block label { font-family: "Courier New", monospace;
-    font-size: .78rem; font-weight: 700; letter-spacing: .1em;
-    text-transform: uppercase; display: flex; justify-content: space-between; }
-  input[type=range] { width: 100%; accent-color: var(--neon-pink); height: 1.6rem; }
+  /* jog pad */
+  .jogwrap { display: flex; gap: 1rem; align-items: center; justify-content: center; }
+  .jog { display: grid; grid-template-areas: ". yp ." "xm h xp" ". ym .";
+    gap: .4rem; justify-items: center; }
+  .jog button { width: 3.1rem; height: 3.1rem; padding: 0; font-size: 1.1rem; border-radius: 12px; }
+  .jog .yp { grid-area: yp; } .jog .ym { grid-area: ym; }
+  .jog .xp { grid-area: xp; } .jog .xm { grid-area: xm; }
+  .jog .jh { grid-area: h; background: var(--pastel-butter); font-size: .85rem; }
+  .jogz { display: grid; gap: .4rem; }
+  .jogz button { width: 3.1rem; height: 3.1rem; padding: 0; font-size: 1rem;
+    border-radius: 12px; background: var(--pastel-sky); }
+  .steps { display: flex; gap: .35rem; justify-content: center; margin-top: .6rem; }
+  .steps button.on { background: var(--neon-cyan); }
+
+  /* thermal */
+  .bar { height: 1.5rem; background: #f0e8f6; border: 2px solid var(--ink);
+    border-radius: 8px; overflow: hidden; position: relative; }
+  .bar > i { display: block; height: 100%; transition: width .5s ease;
+    background: repeating-linear-gradient(45deg, var(--neon-pink) 0 12px, var(--neon-violet) 12px 24px); }
+  .bar.cool > i { background: repeating-linear-gradient(45deg, var(--neon-cyan) 0 12px, #7df 12px 24px); }
+  .bar > em { position: absolute; inset: 0; display: grid; place-items: center;
+    font-style: normal; font-weight: 700; font-size: .72rem; font-family: "Courier New", monospace; }
+  #tempGraph { width: 100%; height: 90px; border: 3px solid var(--ink);
+    border-radius: 8px; background: #fff; margin-top: .6rem; }
   .numrow { display: flex; gap: .5rem; align-items: center; }
-  input[type=number], select {
-    font-family: "Courier New", monospace; font-size: .9rem;
-    border: 3px solid var(--ink); border-radius: 8px; padding: .35rem .5rem;
-    background: #fff; min-width: 0;
-  }
+  input[type=number], input[type=text], select {
+    font-family: "Courier New", monospace; font-size: .85rem;
+    border: 3px solid var(--ink); border-radius: 8px; padding: .3rem .5rem;
+    background: #fff; min-width: 0; }
   select { max-width: 100%; }
-  input[type=file] { font-size: .8rem; }
-
-  .posgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: .5rem;
+  input[type=range] { width: 100%; accent-color: var(--neon-pink); height: 1.4rem; }
+  .slider-block { margin: .55rem 0; }
+  .slider-block label { font-family: "Courier New", monospace; font-size: .72rem;
+    font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    display: flex; justify-content: space-between; }
+  .posgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: .45rem;
     text-align: center; font-family: "Courier New", monospace; }
   .posgrid div { border: 2px solid var(--ink); border-radius: 8px;
-    padding: .4rem .2rem; background: var(--pastel-sky); }
-  .posgrid b { display: block; font-size: .7rem; letter-spacing: .15em; }
-  .toast {
-    position: fixed; right: 1rem; bottom: 1rem; z-index: 60;
-    background: var(--ink); color: var(--neon-lime); padding: .8rem 1.2rem;
-    border: 3px solid var(--neon-lime); border-radius: 10px;
-    font-family: "Courier New", monospace; display: none; max-width: 26rem;
-  }
-  .big { font-size: 1.5rem; font-weight: 800; font-family: "Courier New", monospace; }
-  .muted { opacity: .65; font-size: .8rem; }
-  .printerswitch { margin-left: auto; }
+    padding: .35rem .15rem; background: var(--pastel-sky); font-size: .85rem; }
+  .posgrid b { display: block; font-size: .65rem; letter-spacing: .15em; }
+
+  /* console */
+  #console { font-family: "Courier New", monospace; font-size: .75rem; height: 160px;
+    overflow-y: auto; background: var(--ink); color: var(--neon-lime);
+    border: 3px solid var(--neon-cyan); border-radius: 8px; padding: .5rem .7rem;
+    white-space: pre-wrap; word-break: break-all; text-shadow: 0 0 6px rgba(204,255,0,.4); }
+  #console .cmd { color: var(--neon-cyan); }
+
+  .chiprow { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .macchip { font-family: "Courier New", monospace; font-size: .68rem; font-weight: 700;
+    border: 2px solid var(--neon-violet); border-radius: 999px; color: var(--neon-violet);
+    background: var(--pastel-lilac); padding: .25rem .7rem; cursor: pointer; }
+  .macchip:hover { background: var(--neon-violet); color: #fff; }
+  .powchip { display: flex; align-items: center; gap: .5rem; font-family: "Courier New", monospace;
+    font-size: .75rem; font-weight: 700; border: 2px solid var(--ink); border-radius: 8px;
+    padding: .35rem .6rem; background: var(--pastel-butter); }
+  .powchip .dot { width: .7rem; height: .7rem; border-radius: 50%;
+    border: 2px solid var(--ink); background: #ccc; }
+  .powchip.on .dot { background: var(--neon-lime); box-shadow: 0 0 8px var(--neon-lime); }
+  .webcam { width: 100%; border: 3px solid var(--neon-cyan); border-radius: 10px;
+    background: #111; min-height: 60px; }
+  .queueitem { font-family: "Courier New", monospace; font-size: .75rem;
+    border-left: 4px solid var(--neon-orange); padding: .15rem .5rem; margin: .2rem 0;
+    background: var(--pastel-butter); border-radius: 0 6px 6px 0; }
+  .filegrid { display: grid; grid-template-columns: 1fr auto; gap: .6rem 1rem; align-items: start; }
+  .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 60; background: var(--ink);
+    color: var(--neon-lime); padding: .8rem 1.2rem; border: 3px solid var(--neon-lime);
+    border-radius: 10px; font-family: "Courier New", monospace; display: none; max-width: 26rem; }
+  .muted { opacity: .65; font-size: .78rem; }
+  .filesearch { width: 100%; margin-bottom: .5rem; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>🛸 MOONRAKER&nbsp;//&nbsp;CONTROL&nbsp;DECK</h1>
-  <select id="printerSel" class="printerswitch" onchange="switchPrinter()"></select>
+  <select id="printerSel" onchange="switchPrinter()"></select>
+  <div style="margin-left:auto" class="zone-tag">CYBERSPACE&nbsp;PRINT&nbsp;OPS</div>
+  <div id="klippyChip" class="kchip">klippy ?</div>
   <div id="stateChip" class="statechip">???</div>
 </header>
 <div class="ticker"><span id="tickerText">BOOTING CYBERDECK…</span></div>
 
 <div class="deck">
 
-  <!-- JOB / PROGRESS -->
-  <section class="card span7 tilt-l c-pink">
-    <h2>// CURRENT JOB</h2>
-    <div class="ringwrap">
-      <svg class="ring" width="150" height="150" viewBox="0 0 120 120">
-        <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ff2fd6"/><stop offset="1" stop-color="#00f5d4"/>
-        </linearGradient></defs>
-        <circle class="bg" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
-        <circle class="fg" id="ringFg" cx="60" cy="60" r="52" fill="none"
-          stroke-width="12" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
-      </svg>
-      <div>
-        <div class="pct" id="pct">0%</div>
-        <div id="eta" class="muted">—</div>
+  <!-- ═══════════ ZONE 1 · JOB ═══════════ -->
+  <div class="zone z1">
+    <div class="zone-h">▓▓ job monitor</div>
+    <section class="card tilt-l">
+      <h2>// CURRENT JOB</h2>
+      <div class="ringwrap">
+        <svg class="ring" width="140" height="140" viewBox="0 0 120 120">
+          <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff2fd6"/><stop offset="1" stop-color="#00f5d4"/>
+          </linearGradient></defs>
+          <circle class="bg" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
+          <circle class="fg" id="ringFg" cx="60" cy="60" r="52" fill="none"
+            stroke-width="12" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div>
+          <div class="pct" id="pct">0%</div>
+          <div id="eta" class="muted">—</div>
+        </div>
+        <img id="thumb" class="thumb" alt="thumbnail"
+          src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
       </div>
-      <img id="thumb" class="thumb" alt="thumbnail"
-        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
-    </div>
-    <div class="fname" id="fname">no file</div>
-    <div class="kv">
-      <b>elapsed</b><span id="elapsed">—</span>
-      <b>remaining</b><span id="remaining">—</span>
-      <b>total est.</b><span id="totalEst">—</span>
-      <b>slicer est.</b><span id="slicerEst">—</span>
-      <b>filament used</b><span id="filUsed">—</span>
-      <b>filament est.</b><span id="filEst">—</span>
-      <b>layer</b><span id="layer">—</span>
-      <b>z height</b><span id="zpos">—</span>
-    </div>
-  </section>
-
-  <!-- CONTROLS -->
-  <section class="card span5 tilt-r c-lime">
-    <h2>// CONTROLS</h2>
-    <div class="btnrow">
-      <button class="b-sky" onclick="act('pause')">⏸ pause</button>
-      <button onclick="act('resume')">▶ resume</button>
-      <button class="b-butter" onclick="confirmAct('cancel','Cancel this print?')">✖ cancel</button>
-      <button class="b-danger" onclick="confirmAct('emergency_stop','⚠ EMERGENCY STOP — kill the printer now?')">☢ E-STOP</button>
-    </div>
-    <div class="slider-block">
-      <label><span>SPEED</span><span id="speedVal">—</span></label>
-      <input type="range" id="speed" min="20" max="200" step="5"
-        oninput="sliderVal('speed')" onchange="act('set_speed',this.value)">
-    </div>
-    <div class="slider-block">
-      <label><span>FLOW</span><span id="flowVal">—</span></label>
-      <input type="range" id="flow" min="20" max="150" step="5"
-        oninput="sliderVal('flow')" onchange="act('set_flow',this.value)">
-    </div>
-    <div class="slider-block">
-      <label><span>PART FAN</span><span id="fanVal">—</span></label>
-      <input type="range" id="fan" min="0" max="100" step="1"
-        oninput="sliderVal('fan')" onchange="act('set_fan',this.value*2.55|0)">
-    </div>
-  </section>
-
-  <!-- TEMPERATURES -->
-  <section class="card span6 tilt-r c-violet">
-    <h2>// TEMPERATURES</h2>
-    <div class="kv"><b>extruder</b><span id="extNow">—</span></div>
-    <div class="bar"><i id="extBar" style="width:0%"></i>
-      <em id="extBarT"></em></div>
-    <div class="numrow" style="margin:.4rem 0 .9rem">
-      <input type="number" id="extTarget" min="0" max="350" placeholder="target °C">
-      <button class="b-pink" onclick="act('set_extruder',byId('extTarget').value)">set</button>
-    </div>
-    <div class="kv"><b>bed</b><span id="bedNow">—</span></div>
-    <div class="bar cool"><i id="bedBar" style="width:0%"></i>
-      <em id="bedBarT"></em></div>
-    <div class="numrow" style="margin-top:.4rem">
-      <input type="number" id="bedTarget" min="0" max="130" placeholder="target °C">
-      <button class="b-sky" onclick="act('set_bed',byId('bedTarget').value)">set</button>
-    </div>
-  </section>
-
-  <!-- MOTION -->
-  <section class="card span6 tilt-l c-cyan">
-    <h2>// MOTION</h2>
-    <div class="posgrid">
-      <div><b>X</b><span id="posX">—</span></div>
-      <div><b>Y</b><span id="posY">—</span></div>
-      <div><b>Z</b><span id="posZ">—</span></div>
-      <div><b>E</b><span id="posE">—</span></div>
-    </div>
-    <div class="kv" style="margin-top:.8rem">
-      <b>move speed</b><span id="moveSpeed">—</span>
-      <b>speed factor</b><span id="speedFactor">—</span>
-      <b>flow factor</b><span id="flowFactor">—</span>
-      <b>print time</b><span id="printTime">—</span>
-      <b>state msg</b><span id="stateMsg">—</span>
-    </div>
-  </section>
-
-  <!-- FILES -->
-  <section class="card span7 tilt-r c-orange">
-    <h2>// FILES</h2>
-    <div class="numrow">
-      <select id="fileSel" style="flex:1"></select>
-      <button onclick="act('print_file',byId('fileSel').value)">⏵ print</button>
-      <button class="b-sky" onclick="act('refresh_files')">⟳</button>
-    </div>
-    <hr style="border:2px dashed var(--neon-orange);margin:1rem 0">
-    <form id="upForm" onsubmit="return uploadFile(event)">
-      <div class="numrow">
-        <input type="file" id="upFile" accept=".gcode,.g,.gco,.bgcode" required>
-        <label style="font-size:.8rem"><input type="checkbox" id="upPrint"> print after</label>
-        <button type="submit" class="b-pink">⇪ upload</button>
+      <div class="fname" id="fname">no file</div>
+      <div class="layerbar"><i id="layerBar" style="width:0%"></i></div>
+      <div class="kv" style="margin-top:.5rem">
+        <b>elapsed</b><span id="elapsed">—</span>
+        <b>remaining</b><span id="remaining">—</span>
+        <b>total est.</b><span id="totalEst">—</span>
+        <b>slicer est.</b><span id="slicerEst">—</span>
+        <b>layer</b><span id="layer">—</span>
+        <b>z height</b><span id="zpos">—</span>
+        <b>filament</b><span id="filUsed">—</span>
+        <b>fil est.</b><span id="filEst">—</span>
       </div>
-    </form>
-  </section>
+    </section>
+    <section class="card tilt-r" id="webcamCard" style="display:none">
+      <h2>// WEBCAM</h2>
+      <img id="webcam" class="webcam" alt="webcam stream">
+    </section>
+  </div>
 
-  <!-- STATS -->
-  <section class="card span5 tilt-l c-pink">
-    <h2>// STATS</h2>
-    <div class="kv">
-      <b>total jobs</b><span id="totJobs">—</span>
-      <b>total print</b><span id="totPrint">—</span>
-      <b>filament life</b><span id="totFil">—</span>
-      <b>longest job</b><span id="longJob">—</span>
-      <b>queue</b><span id="queueState">—</span>
-      <b>spool</b><span id="spool">—</span>
-      <b>klippy</b><span id="klippy">—</span>
-      <b>updates</b><span id="updates">—</span>
-    </div>
-  </section>
+  <!-- ═══════════ ZONE 2 · OPERATE ═══════════ -->
+  <div class="zone z2">
+    <div class="zone-h">▓▓ operate</div>
+    <section class="card tilt-r">
+      <h2>// JOB CONTROL</h2>
+      <div class="btnrow">
+        <button class="b-sky" onclick="act('pause')">⏸ pause</button>
+        <button onclick="act('resume')">▶ resume</button>
+        <button class="b-butter" onclick="confirmAct('cancel','Cancel this print?')">✖ cancel</button>
+        <button class="b-danger" onclick="confirmAct('emergency_stop','⚠ EMERGENCY STOP?')">☢ e-stop</button>
+      </div>
+    </section>
+    <section class="card tilt-l">
+      <h2>// MOTION</h2>
+      <div class="jogwrap">
+        <div class="jog">
+          <button class="yp b-sky" onclick="jog('Y',1)">Y+</button>
+          <button class="xm b-sky" onclick="jog('X',-1)">X−</button>
+          <button class="jh" onclick="act('home_all')">⌂</button>
+          <button class="xp b-sky" onclick="jog('X',1)">X+</button>
+          <button class="ym b-sky" onclick="jog('Y',-1)">Y−</button>
+        </div>
+        <div class="jogz">
+          <button onclick="jog('Z',1)">Z+</button>
+          <button onclick="act('home_z')">Z⌂</button>
+          <button onclick="jog('Z',-1)">Z−</button>
+        </div>
+      </div>
+      <div class="steps" id="steps">
+        <button class="sm" onclick="setStep(this,.1)">0.1</button>
+        <button class="sm" onclick="setStep(this,1)">1</button>
+        <button class="sm on" onclick="setStep(this,10)">10</button>
+        <button class="sm" onclick="setStep(this,50)">50</button>
+      </div>
+      <div class="btnrow" style="margin-top:.7rem">
+        <button class="sm b-sky" onclick="act('home_x')">home x</button>
+        <button class="sm b-sky" onclick="act('home_y')">home y</button>
+        <button class="sm b-sky" onclick="act('home_z')">home z</button>
+        <button class="sm b-peach" onclick="confirmAct('motors_off','Release stepper motors?')">motors off</button>
+      </div>
+      <h2 style="margin-top:.9rem">// Z OFFSET</h2>
+      <div class="btnrow">
+        <button class="sm b-pink" onclick="act('z_adjust',-0.05)">−0.05</button>
+        <button class="sm b-pink" onclick="act('z_adjust',-0.01)">−0.01</button>
+        <button class="sm b-pink" onclick="act('z_adjust',0.01)">+0.01</button>
+        <button class="sm b-pink" onclick="act('z_adjust',0.05)">+0.05</button>
+      </div>
+      <div class="posgrid" style="margin-top:.7rem">
+        <div><b>X</b><span id="posX">—</span></div>
+        <div><b>Y</b><span id="posY">—</span></div>
+        <div><b>Z</b><span id="posZ">—</span></div>
+        <div><b>E</b><span id="posE">—</span></div>
+      </div>
+      <div class="kv" style="margin-top:.6rem">
+        <b>move speed</b><span id="moveSpeed">—</span>
+        <b>print time</b><span id="printTime">—</span>
+        <b>state msg</b><span id="stateMsg">—</span>
+      </div>
+    </section>
+    <section class="card tilt-r">
+      <h2>// CONSOLE</h2>
+      <pre id="console"></pre>
+      <div class="numrow" style="margin-top:.5rem">
+        <input type="text" id="gcodeIn" style="flex:1" placeholder="send gcode… (G28, M105…)"
+          onkeydown="if(event.key==='Enter')sendGcode()">
+        <button class="sm b-sky" onclick="sendGcode()">send</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════ ZONE 3 · THERMAL ═══════════ -->
+  <div class="zone z3">
+    <div class="zone-h">▓▓ thermal · tune</div>
+    <section class="card tilt-l">
+      <h2>// TEMPERATURES</h2>
+      <div class="kv"><b>extruder</b><span id="extNow">—</span></div>
+      <div class="bar"><i id="extBar" style="width:0%"></i><em id="extBarT"></em></div>
+      <div class="numrow" style="margin:.35rem 0 .7rem">
+        <input type="number" id="extTarget" min="0" max="350" placeholder="°C">
+        <button class="sm b-pink" onclick="act('set_extruder',byId('extTarget').value)">set</button>
+      </div>
+      <div class="kv"><b>bed</b><span id="bedNow">—</span></div>
+      <div class="bar cool"><i id="bedBar" style="width:0%"></i><em id="bedBarT"></em></div>
+      <div class="numrow" style="margin:.35rem 0 .5rem">
+        <input type="number" id="bedTarget" min="0" max="130" placeholder="°C">
+        <button class="sm b-sky" onclick="act('set_bed',byId('bedTarget').value)">set</button>
+      </div>
+      <canvas id="tempGraph" width="520" height="90"></canvas>
+      <div class="btnrow" style="margin-top:.6rem">
+        <button class="sm b-butter" onclick="act('preheat',null,'pla')">pla</button>
+        <button class="sm b-butter" onclick="act('preheat',null,'petg')">petg</button>
+        <button class="sm b-butter" onclick="act('preheat',null,'abs')">abs</button>
+        <button class="sm b-sky" onclick="act('cooldown')">cool down</button>
+      </div>
+    </section>
+    <section class="card tilt-r">
+      <h2>// TUNE</h2>
+      <div class="slider-block">
+        <label><span>SPEED</span><span id="speedVal">—</span></label>
+        <input type="range" id="speed" min="20" max="200" step="5"
+          oninput="sliderVal('speed')" onchange="act('set_speed',this.value)">
+      </div>
+      <div class="slider-block">
+        <label><span>FLOW</span><span id="flowVal">—</span></label>
+        <input type="range" id="flow" min="20" max="150" step="5"
+          oninput="sliderVal('flow')" onchange="act('set_flow',this.value)">
+      </div>
+      <div class="slider-block">
+        <label><span>PART FAN</span><span id="fanVal">—</span></label>
+        <input type="range" id="fan" min="0" max="100" step="1"
+          oninput="sliderVal('fan')" onchange="act('set_fan',this.value*2.55|0)">
+      </div>
+      <div class="kv"><b>speed factor</b><span id="speedFactor">—</span>
+        <b>flow factor</b><span id="flowFactor">—</span></div>
+    </section>
+    <section class="card tilt-l">
+      <h2>// POWER · MACROS</h2>
+      <div class="chiprow" id="powerRow"><span class="muted">—</span></div>
+      <h2 style="margin-top:.9rem">// MACROS</h2>
+      <div class="chiprow" id="macroRow"><span class="muted">—</span></div>
+    </section>
+  </div>
+
+  <!-- ═══════════ ZONE 4 · FILES & SYSTEM ═══════════ -->
+  <div class="zone z4">
+    <div class="zone-h">▓▓ files · queue · system</div>
+    <section class="card">
+      <div class="filegrid">
+        <div>
+          <h2>// FILES</h2>
+          <input type="text" id="fileSearch" class="filesearch" placeholder="filter files…"
+            oninput="renderFiles()">
+          <div class="numrow">
+            <select id="fileSel" style="flex:1"></select>
+          </div>
+          <div class="btnrow" style="margin-top:.5rem">
+            <button class="sm" onclick="act('print_file',byId('fileSel').value)">⏵ print</button>
+            <button class="sm b-sky" onclick="act('enqueue_file',byId('fileSel').value)">+ queue</button>
+            <button class="sm b-butter" onclick="act('start_queue')">▶▶ start queue</button>
+            <button class="sm b-danger" onclick="confirmAct('delete_file','Delete '+byId('fileSel').value+'?',byId('fileSel').value)">🗑</button>
+            <button class="sm b-lilac" onclick="act('refresh_files')">⟳</button>
+          </div>
+          <h2 style="margin-top:.9rem">// QUEUE <span id="queueState" class="muted"></span></h2>
+          <div id="queueList"><span class="muted">—</span></div>
+          <h2 style="margin-top:.9rem">// UPLOAD</h2>
+          <form onsubmit="return uploadFile(event)">
+            <div class="numrow">
+              <input type="file" id="upFile" accept=".gcode,.g,.gco,.bgcode" required>
+              <label style="font-size:.75rem"><input type="checkbox" id="upPrint"> print after</label>
+              <button type="submit" class="sm b-pink">⇪ upload</button>
+            </div>
+          </form>
+        </div>
+        <div style="min-width:290px">
+          <h2>// STATS</h2>
+          <div class="kv">
+            <b>total jobs</b><span id="totJobs">—</span>
+            <b>total print</b><span id="totPrint">—</span>
+            <b>filament life</b><span id="totFil">—</span>
+            <b>longest job</b><span id="longJob">—</span>
+            <b>spool</b><span id="spool">—</span>
+            <b>updates</b><span id="updates">—</span>
+          </div>
+          <h2 style="margin-top:.9rem">// SYSTEM</h2>
+          <div class="btnrow">
+            <button class="sm b-butter" onclick="confirmAct('firmware_restart','Firmware restart?')">fw restart</button>
+            <button class="sm b-butter" onclick="confirmAct('server_restart','Restart moonraker?')">svr restart</button>
+            <button class="sm b-peach" onclick="confirmAct('host_restart','Reboot printer host?')">host reboot</button>
+            <button class="sm b-danger" onclick="confirmAct('host_shutdown','SHUT DOWN printer host?')">host off</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 
 </div>
 <div class="toast" id="toast"></div>
@@ -356,40 +429,41 @@ const API = {
   action: `/api/moonraker/panel_action`,
   upload: `/api/moonraker/gcode_upload`,
 };
-let printer = '';
+let printer = '', jogStep = 10, consoleLen = 0, lastFiles = [], selectedFile = '';
+const extHist = [], bedHist = [];
 const byId = id => document.getElementById(id);
 const fmt = (v,d=1) => (v==null||isNaN(v)) ? '—' : Number(v).toFixed(d);
 function dur(s){ if(s==null||isNaN(s)) return '—'; s=Math.floor(s);
   const h=s/3600|0,m=(s%3600)/60|0,x=s%60;
   return `${h? h+'h ':''}${m}m ${x}s`; }
-function toast(msg,ms=3500){ const t=byId('toast'); t.textContent=msg;
+function toast(msg,ms=3200){ const t=byId('toast'); t.textContent=msg;
   t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',ms); }
-
 function sliderVal(id){ const map={speed:'speedVal',flow:'flowVal',fan:'fanVal'};
   byId(map[id]).textContent = byId(id).value + '%'; }
+function switchPrinter(){ printer = byId('printerSel').value; consoleLen=0;
+  extHist.length=0; bedHist.length=0; refresh(); }
+function setStep(btn,v){ jogStep=v;
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); }
+function jog(axis,dir){ act('jog',null,null,{axis, dist: dir*jogStep}); }
+function sendGcode(){ const v=byId('gcodeIn').value.trim(); if(!v)return;
+  byId('gcodeIn').value=''; act('run_gcode',null,null,{script:v}); }
 
-function switchPrinter(){ printer = byId('printerSel').value; refresh(); }
-
-async function refresh(){
-  try {
-    const r = await fetch(API.data(printer));
-    const d = await r.json();
-    if (d.error) { toast(d.error); return; }
-    render(d);
-  } catch(e) { /* transient */ }
-}
-
-async function act(action, value){
+async function act(action, value, preset, extra){
   const body = {entry_id: printer, action};
-  if (action.startsWith('set_')) body.value = Number(value);
-  else if (action==='print_file'||action==='select_file') body.filename = value;
+  if (['set_speed','set_flow','set_fan','set_extruder','set_bed','z_adjust','z_set']
+      .includes(action)) body.value = Number(value);
+  if (preset) body.preset = preset;
+  if (['print_file','select_file','enqueue_file','delete_file'].includes(action))
+    body.filename = value;
+  if (extra) Object.assign(body, extra);
   const r = await fetch(API.action, {method:'POST',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   const j = await r.json().catch(()=>({}));
   toast(j.ok ? `✓ ${action}` : `✗ ${j.error||r.status}`);
   refresh();
 }
-function confirmAct(action,msg){ if(confirm(msg)) act(action); }
+function confirmAct(action,msg,filename){ if(confirm(msg)) act(action,null,null,filename?{filename}:undefined); }
 
 async function uploadFile(ev){
   ev.preventDefault();
@@ -401,6 +475,24 @@ async function uploadFile(ev){
   toast(r.ok ? '⇪ uploaded' : `✗ upload failed (${r.status})`);
   setTimeout(refresh, 1500);
   return false;
+}
+
+function renderFiles(){
+  const fs = byId('fileSel'), q = (byId('fileSearch').value||'').toLowerCase();
+  fs.innerHTML = '';
+  lastFiles.filter(f=>!q || f.path.toLowerCase().includes(q))
+    .forEach(f=>{ const o=document.createElement('option');
+      o.value=f.path; o.textContent=f.path; fs.appendChild(o); });
+  fs.value = selectedFile;
+}
+
+async function refresh(){
+  try {
+    const r = await fetch(API.data(printer));
+    const d = await r.json();
+    if (d.error) { toast(d.error); return; }
+    render(d);
+  } catch(e) { /* transient */ }
 }
 
 function render(d){
@@ -416,16 +508,18 @@ function render(d){
   const ex = s.extruder||{}, bed = s.heater_bed||{}, fan = s.fan||{};
   const gm = s.gcode_move||{}, th = s.toolhead||{};
 
-  // state chip + ticker
   const st = (ps.state||'unknown').toUpperCase();
   const chip = byId('stateChip'); chip.textContent = d.available? st : 'OFFLINE';
   chip.className = 'statechip' + (d.available? '' : ' bad');
+  const kl = (d.printer_info||{}).klippy_state || '—';
+  byId('klippyChip').textContent = 'klippy ' + kl;
   byId('tickerText').textContent =
-    `${d.printer}  ///  state:${st}  ///  file:${ps.filename||'none'}  ///  `+
+    `${d.printer}  ///  state:${st}  ///  klippy:${kl}  ///  file:${ps.filename||'none'}  ///  `+
     `progress:${(((ds.progress??vs.progress)||0)*100).toFixed(1)}%  ///  `+
+    `ext:${fmt(ex.temperature,0)}°C bed:${fmt(bed.temperature,0)}°C  ///  `+
     `${ps.message||ds.message||''}  ///  sysnom.sysnom.sysnom`;
 
-  // progress ring
+  // job
   const prog = ds.progress ?? vs.progress ?? 0;
   byId('ringFg').style.strokeDashoffset = 326.7*(1-Math.min(prog,1));
   byId('pct').textContent = (prog*100).toFixed(1)+'%';
@@ -440,50 +534,94 @@ function render(d){
   byId('filUsed').textContent = fmt(ps.filament_used/1000,2)+' m';
   byId('filEst').textContent = fmt((meta.filament_total||0)/1000,2)+' m';
   const z = (th.position||[])[2];
-  let layerTxt = '—';
-  if (meta.layer_height && meta.first_layer_height && z!=null && meta.layer_count)
-    layerTxt = `${Math.min(Math.max(Math.round((z-meta.first_layer_height)/meta.layer_height)+1,1),meta.layer_count)} / ${meta.layer_count}`;
+  let layerTxt = '—', layerFrac = 0;
+  if (meta.layer_height && meta.first_layer_height && z!=null && meta.layer_count){
+    const cur = Math.min(Math.max(Math.round((z-meta.first_layer_height)/meta.layer_height)+1,1),meta.layer_count);
+    layerTxt = `${cur} / ${meta.layer_count}`; layerFrac = cur/meta.layer_count;
+  }
   byId('layer').textContent = layerTxt;
+  byId('layerBar').style.width = (layerFrac*100)+'%';
   byId('zpos').textContent = fmt(z,2)+' mm';
 
-  // temps
+  // temps + graph
   byId('extNow').textContent = fmt(ex.temperature)+'°C → '+fmt(ex.target)+'°C';
   byId('extBar').style.width = Math.min((ex.temperature||0)/300*100,100)+'%';
   byId('extBarT').textContent = fmt(ex.temperature,0)+' / '+fmt(ex.target,0)+'°C';
-  if (document.activeElement!==byId('extTarget')) byId('extTarget').value = fmt(ex.target,0)==='—'?'':Math.round(ex.target||0);
   byId('bedNow').textContent = fmt(bed.temperature)+'°C → '+fmt(bed.target)+'°C';
   byId('bedBar').style.width = Math.min((bed.temperature||0)/130*100,100)+'%';
   byId('bedBarT').textContent = fmt(bed.temperature,0)+' / '+fmt(bed.target,0)+'°C';
-  if (document.activeElement!==byId('bedTarget')) byId('bedTarget').value = fmt(bed.target,0)==='—'?'':Math.round(bed.target||0);
+  if (document.activeElement!==byId('extTarget'))
+    byId('extTarget').value = ex.target==null?'':Math.round(ex.target);
+  if (document.activeElement!==byId('bedTarget'))
+    byId('bedTarget').value = bed.target==null?'':Math.round(bed.target);
+  if (ex.temperature!=null){ extHist.push(ex.temperature); bedHist.push(bed.temperature||0);
+    if (extHist.length>150){ extHist.shift(); bedHist.shift(); } }
+  drawGraph(ex.target, bed.target);
 
-  // sliders follow printer unless user is dragging
-  if (document.activeElement!==byId('speed'))
-    byId('speed').value = Math.round((gm.speed_factor||0)*100);
-  if (document.activeElement!==byId('flow'))
-    byId('flow').value = Math.round((gm.extrude_factor||0)*100);
-  if (document.activeElement!==byId('fan'))
-    byId('fan').value = Math.round((fan.speed||0)*100);
+  // tune
+  if (document.activeElement!==byId('speed')) byId('speed').value = Math.round((gm.speed_factor||0)*100);
+  if (document.activeElement!==byId('flow')) byId('flow').value = Math.round((gm.extrude_factor||0)*100);
+  if (document.activeElement!==byId('fan')) byId('fan').value = Math.round((fan.speed||0)*100);
   byId('speedVal').textContent = Math.round((gm.speed_factor||0)*100)+'%';
   byId('flowVal').textContent = Math.round((gm.extrude_factor||0)*100)+'%';
   byId('fanVal').textContent = Math.round((fan.speed||0)*100)+'%';
+  byId('speedFactor').textContent = Math.round((gm.speed_factor||0)*100)+'%';
+  byId('flowFactor').textContent = Math.round((gm.extrude_factor||0)*100)+'%';
 
   // motion
   const p = th.position||[];
-  byId('posX').textContent = fmt(p[0]); byId('posY').textContent = fmt(p[1]);
-  byId('posZ').textContent = fmt(p[2]); byId('posE').textContent = fmt(p[3]);
+  byId('posX').textContent=fmt(p[0]); byId('posY').textContent=fmt(p[1]);
+  byId('posZ').textContent=fmt(p[2]); byId('posE').textContent=fmt(p[3]);
   byId('moveSpeed').textContent = fmt(gm.speed,0)+' mm/s';
-  byId('speedFactor').textContent = Math.round((gm.speed_factor||0)*100)+'%';
-  byId('flowFactor').textContent = Math.round((gm.extrude_factor||0)*100)+'%';
   byId('printTime').textContent = dur(th.print_time);
   byId('stateMsg').textContent = ps.message || ds.message || '—';
 
-  // files
-  const fs = byId('fileSel');
-  const cur = fs.value;
-  fs.innerHTML = '';
-  (d.files||[]).forEach(f=>{ const o=document.createElement('option');
-    o.value=f.path; o.textContent=f.path; fs.appendChild(o); });
-  fs.value = d.selected_file || cur;
+  // files / queue
+  lastFiles = d.files||[]; selectedFile = d.selected_file || byId('fileSel').value;
+  renderFiles();
+  const q = d.queue||{};
+  byId('queueState').textContent = q.queue_state!=null ? `(${q.queue_state})` : '';
+  byId('queueList').innerHTML = (q.queued_jobs||[]).length
+    ? q.queued_jobs.map(j=>`<div class="queueitem">▸ ${j.filename||j}</div>`).join('')
+    : '<span class="muted">queue empty</span>';
+
+  // power
+  const pr = byId('powerRow');
+  pr.innerHTML = (d.power_devices||[]).length ? '' : '<span class="muted">no power devices</span>';
+  (d.power_devices||[]).forEach(dev=>{
+    const c=document.createElement('button');
+    c.className='powchip'+(dev.status==='on'?' on':''); c.type='button';
+    c.innerHTML=`<span class="dot"></span>${dev.device}`;
+    c.onclick=()=>act('power',null,null,{device:dev.device,
+      power_action:dev.status==='on'?'off':'on'});
+    pr.appendChild(c);
+  });
+
+  // macros
+  const mr = byId('macroRow');
+  mr.innerHTML = (d.macros||[]).length ? '' : '<span class="muted">—</span>';
+  (d.macros||[]).forEach(m=>{ const b=document.createElement('button');
+    b.type='button'; b.className='macchip'; b.textContent=m.toLowerCase();
+    b.onclick=()=>{ if(confirm(`Run macro ${m}?`))
+      act('run_macro',null,null,{script:m}); };
+    mr.appendChild(b); });
+
+  // console
+  const lines = d.gcode_responses||[];
+  if (lines.length !== consoleLen){
+    const c = byId('console');
+    c.textContent = lines.join('\n');
+    c.scrollTop = c.scrollHeight;
+    consoleLen = lines.length;
+  }
+
+  // webcam
+  const wc = (d.webcams||[])[0];
+  if (wc && wc.stream_url){
+    byId('webcamCard').style.display='';
+    if (!byId('webcam').src || !byId('webcam').src.startsWith(wc.stream_url))
+      byId('webcam').src = wc.stream_url;
+  }
 
   // stats
   const ht = (d.history||{}).job_totals||{};
@@ -491,15 +629,36 @@ function render(d){
   byId('totPrint').textContent = dur(ht.total_print_time);
   byId('totFil').textContent = fmt((ht.total_filament_used||0)/1000,1)+' m';
   byId('longJob').textContent = dur(ht.longest_print);
-  const q = d.queue||{};
-  byId('queueState').textContent =
-    q.queue_state!=null ? `${q.queue_state} (${(q.queued_jobs||[]).length} jobs)` : '—';
   const sp = d.spoolman||{};
   byId('spool').textContent = sp.spool_id!=null ? 'spool #'+sp.spool_id : '—';
-  byId('klippy').textContent = (d.printer_info||{}).klippy_state || '—';
   const vi = (d.machine_update||{}).version_info||{};
-  const upd = Object.values(vi).filter(v=>v && v.current_version && v.remote_version && v.current_version!==v.remote_version).length;
-  byId('updates').textContent = vi? upd+' pending' : '—';
+  const upd = Object.values(vi).filter(v=>v && v.current_version && v.remote_version
+    && v.current_version!==v.remote_version).length;
+  byId('updates').textContent = Object.keys(vi).length ? upd+' pending' : '—';
+}
+
+function drawGraph(extT, bedT){
+  const cv = byId('tempGraph'), ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#fdf8ff'; ctx.fillRect(0,0,W,H);
+  const max = Math.max(60, ...extHist, ...bedHist)*1.15;
+  function line(arr, color, dash){
+    if (!arr.length) return;
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+    if (dash) ctx.setLineDash([4,3]);
+    arr.forEach((v,i)=>{
+      const x = i/(Math.max(arr.length-1,1))*W, y = H-(v/max)*H;
+      i? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  line(extHist,'#ff2fd6'); line(bedHist,'#00c2a8');
+  if (extT!=null){ ctx.setLineDash([3,3]); ctx.strokeStyle='#8a2bff';
+    ctx.beginPath(); ctx.moveTo(0,H-(extT/max)*H); ctx.lineTo(W,H-(extT/max)*H); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.font = '10px monospace'; ctx.fillStyle='#241d2b';
+  ctx.fillText('E '+fmt(extHist.at(-1),0)+'°',6,12);
+  ctx.fillStyle='#00806c'; ctx.fillText('B '+fmt(bedHist.at(-1),0)+'°',60,12);
 }
 
 refresh();

@@ -55,6 +55,11 @@ _DIRECT_ACTIONS = {
     "resume": METHODS.PRINTER_PRINT_RESUME,
     "cancel": METHODS.PRINTER_PRINT_CANCEL,
     "emergency_stop": METHODS.PRINTER_EMERGENCY_STOP,
+    "firmware_restart": METHODS.PRINTER_FIRMWARE_RESTART,
+    "server_restart": METHODS.SERVER_RESTART,
+    "host_restart": METHODS.HOST_RESTART,
+    "host_shutdown": METHODS.HOST_SHUTDOWN,
+    "start_queue": METHODS.SERVER_JOB_QUEUE_START,
 }
 
 _GCODE_ACTIONS = {
@@ -63,6 +68,20 @@ _GCODE_ACTIONS = {
     "set_fan": "M106 S{}",
     "set_extruder": "M104 S{}",
     "set_bed": "M140 S{}",
+    "z_adjust": "SET_GCODE_OFFSET Z_ADJUST={}",
+    "z_set": "SET_GCODE_OFFSET Z={}",
+    "motors_off": "M84",
+    "cooldown": "M104 S0\nM140 S0\nM107",
+    "home_x": "G28 X",
+    "home_y": "G28 Y",
+    "home_z": "G28 Z",
+    "home_all": "G28",
+}
+
+_PREHEAT_PRESETS = {
+    "pla": (200, 60),
+    "petg": (240, 80),
+    "abs": (245, 100),
 }
 
 
@@ -76,6 +95,18 @@ def _entry_port(entry) -> int:
     """Return the effective Moonraker port for a config entry."""
     port = entry.data.get(CONF_PORT, DEFAULT_PORT)
     return int(port) if port not in (None, "") else DEFAULT_PORT
+
+
+def _webcam_url(entry, url: str | None) -> str | None:
+    """Resolve a Moonraker webcam URL to an absolute URL."""
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    scheme = "https" if entry.data.get(CONF_TLS, False) else "http"
+    host = entry.data.get(CONF_URL)
+    port = _entry_port(entry)
+    return f"{scheme}://{host}:{port}/{url.lstrip('/')}"
 
 
 class _PanelViewBase(HomeAssistantView):
@@ -134,10 +165,45 @@ class MoonrakerPanelDataView(_PanelViewBase):
             return self.json({"error": "no printer configured"}, status_code=404)
 
         data = coordinator.data or {}
+        status = data.get("status") or {}
         file_list = data.get("file_list") or {}
         files = file_list.get("files") if isinstance(file_list, dict) else file_list
         if not isinstance(files, list):
             files = []
+
+        webcams = []
+        try:
+            webcam_result = await coordinator.async_get_webcams()
+        except Exception:  # noqa: BLE001 - webcams are optional
+            webcam_result = {}
+        entry = coordinator.config_entry
+        for webcam in (webcam_result or {}).get("webcams", []):
+            if not isinstance(webcam, dict):
+                continue
+            webcams.append(
+                {
+                    "name": webcam.get("name"),
+                    "stream_url": _webcam_url(entry, webcam.get("stream_url")),
+                    "snapshot_url": _webcam_url(entry, webcam.get("snapshot_url")),
+                }
+            )
+
+        power = data.get("power_devices") or {}
+        power_devices = [
+            {
+                "device": device.get("device"),
+                "status": device.get("status"),
+                "locked_while_printing": device.get("locked_while_printing"),
+            }
+            for device in power.get("devices", [])
+            if isinstance(device, dict) and device.get("device")
+        ]
+
+        macros = sorted(
+            obj.partition(" ")[2]
+            for obj in status
+            if obj.startswith("gcode_macro ")
+        )
 
         return self.json(
             {
@@ -145,13 +211,17 @@ class MoonrakerPanelDataView(_PanelViewBase):
                 "printer": coordinator.api_device_name,
                 "available": coordinator.last_update_success,
                 "selected_file": coordinator.selected_file,
-                "status": data.get("status") or {},
+                "status": status,
                 "printer_info": data.get("printer.info") or {},
                 "meta": {key: data.get(key) for key in _META_KEYS},
                 "history": data.get("history") or {},
                 "queue": data.get("queue") or {},
                 "spoolman": data.get("spoolman") or {},
                 "machine_update": data.get("machine_update") or {},
+                "power_devices": power_devices,
+                "macros": macros,
+                "webcams": webcams,
+                "gcode_responses": list(coordinator.gcode_responses)[-80:],
                 "files": [
                     {
                         "path": file.get("path"),
@@ -227,46 +297,116 @@ class MoonrakerPanelActionView(_PanelViewBase):
 
         action = str(payload.get("action") or "")
         try:
-            if action in _DIRECT_ACTIONS:
-                await coordinator.async_send_data(_DIRECT_ACTIONS[action])
-            elif action in _GCODE_ACTIONS:
-                try:
-                    value = float(payload.get("value"))
-                except (TypeError, ValueError):
-                    return self.json(
-                        {"error": "numeric value required"}, status_code=400
-                    )
-                await coordinator.async_send_data(
-                    METHODS.PRINTER_GCODE_SCRIPT,
-                    {"script": _GCODE_ACTIONS[action].format(value)},
-                )
-            elif action == "select_file":
-                filename = str(payload.get("filename") or "").strip()
-                if not filename:
-                    return self.json(
-                        {"error": "filename required"}, status_code=400
-                    )
+            error = await self._run_action(coordinator, action, payload)
+        except Exception as exception:  # noqa: BLE001 - surfaced to the UI
+            _LOGGER.debug("Moonraker panel action %s failed", action, exc_info=True)
+            return self.json({"error": str(exception)}, status_code=502)
+        if error:
+            return self.json({"error": error}, status_code=400)
+        return self.json({"ok": True})
+
+    async def _run_action(self, coordinator, action: str, payload) -> str | None:
+        """Execute a panel action; return an error string or None."""
+        if action in _DIRECT_ACTIONS:
+            await coordinator.async_send_data(_DIRECT_ACTIONS[action])
+            return None
+
+        if action == "jog":
+            axis = str(payload.get("axis") or "").upper()
+            try:
+                distance = float(payload.get("dist"))
+            except (TypeError, ValueError):
+                return "numeric distance required"
+            if axis not in ("X", "Y", "Z"):
+                return "axis must be X, Y, or Z"
+            feed = 600 if axis == "Z" else 6000
+            await coordinator.async_send_data(
+                METHODS.PRINTER_GCODE_SCRIPT,
+                {"script": f"G91\nG1 {axis}{distance} F{feed}\nG90"},
+            )
+            return None
+
+        if action == "preheat":
+            preset = str(payload.get("preset") or "").lower()
+            temps = _PREHEAT_PRESETS.get(preset)
+            if temps is None:
+                return "unknown preset"
+            await coordinator.async_send_data(
+                METHODS.PRINTER_GCODE_SCRIPT,
+                {"script": f"M104 S{temps[0]}\nM140 S{temps[1]}"},
+            )
+            return None
+
+        if action in ("run_gcode", "run_macro"):
+            script = str(payload.get("script") or "").strip()
+            if not script:
+                return "script required"
+            await coordinator.async_send_data(
+                METHODS.PRINTER_GCODE_SCRIPT, {"script": script}
+            )
+            return None
+
+        if action in ("select_file", "print_file", "enqueue_file"):
+            filename = str(payload.get("filename") or "").strip() or (
+                coordinator.selected_file or ""
+            )
+            if not filename:
+                return "no file selected"
+            if action == "select_file":
                 coordinator.selected_file = filename
             elif action == "print_file":
-                filename = str(payload.get("filename") or "").strip() or (
-                    coordinator.selected_file or ""
-                )
-                if not filename:
-                    return self.json(
-                        {"error": "no file selected"}, status_code=400
-                    )
                 coordinator.selected_file = filename
                 await coordinator.async_send_data(
                     METHODS.PRINTER_PRINT_START, {"filename": filename}
                 )
-            elif action == "refresh_files":
-                await coordinator.async_refresh_files()
             else:
-                return self.json({"error": "unknown action"}, status_code=400)
-        except Exception as exception:  # noqa: BLE001 - surfaced to the UI
-            return self.json({"error": str(exception)}, status_code=502)
+                await coordinator.async_send_data(
+                    METHODS.SERVER_JOB_QUEUE_POST_JOB,
+                    {"filenames": [filename]},
+                )
+            return None
 
-        return self.json({"ok": True})
+        if action == "delete_file":
+            filename = str(payload.get("filename") or "").strip()
+            if not filename:
+                return "filename required"
+            await coordinator.async_send_data(
+                METHODS.SERVER_FILES_DELETE_FILE, {"path": filename}
+            )
+            await coordinator.async_refresh_files()
+            return None
+
+        if action == "power":
+            device = str(payload.get("device") or "").strip()
+            power_action = str(payload.get("power_action") or "").lower()
+            if not device or power_action not in ("on", "off"):
+                return "device and power_action=on|off required"
+            await coordinator.async_send_data(
+                METHODS.MACHINE_DEVICE_POWER_POST_DEVICE,
+                {"device": device, "action": power_action},
+            )
+            return None
+
+        if action == "refresh_files":
+            await coordinator.async_refresh_files()
+            return None
+
+        if action in _GCODE_ACTIONS:
+            template = _GCODE_ACTIONS[action]
+            if "{}" in template:
+                try:
+                    value = float(payload.get("value"))
+                except (TypeError, ValueError):
+                    return "numeric value required"
+                script = template.format(value)
+            else:
+                script = template
+            await coordinator.async_send_data(
+                METHODS.PRINTER_GCODE_SCRIPT, {"script": script}
+            )
+            return None
+
+        return "unknown action"
 
 
 def register_panel_views(hass: HomeAssistant) -> None:

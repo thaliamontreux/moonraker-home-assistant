@@ -1,6 +1,7 @@
 """Moonraker integration for Home Assistant."""
 
 import asyncio
+from collections import deque
 from collections.abc import Callable
 import html
 import logging
@@ -46,6 +47,7 @@ from .const import (
     DOMAIN,
     HOSTNAME,
     METHODS,
+    NOTIFY_GCODE_RESPONSE,
     OBJ,
     PLATFORMS,
     TIMEOUT,
@@ -585,6 +587,9 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
         self._config_settings_lock = asyncio.Lock()
         self._system_info: dict[str, Any] | None = None
         self._system_info_lock = asyncio.Lock()
+        self._webcams: dict[str, Any] | None = None
+        self._webcams_lock = asyncio.Lock()
+        self.gcode_responses: deque[str] = deque(maxlen=300)
         self._gcode_metadata_cache_key: tuple[str, str | None] | None = None
         self._gcode_metadata_cache: dict[str, Any] | None = None
         self._subscribed_to_status = False
@@ -827,6 +832,16 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
                     )
         return self._system_info
 
+    async def async_get_webcams(self):
+        """Return configured Moonraker webcams, fetching them once per setup."""
+        if self._webcams is None:
+            async with self._webcams_lock:
+                if self._webcams is None:
+                    self._webcams = await self._async_fetch_data(
+                        METHODS.SERVER_WEBCAMS_LIST, None, quiet=True
+                    )
+        return self._webcams
+
     def set_initial_data(self, key: str, value: Any) -> None:
         """Add setup-time data without triggering a full coordinator refresh."""
         self.data = {**(self.data or {}), key: value}
@@ -993,6 +1008,11 @@ class MoonrakerDataUpdateCoordinator(DataUpdateCoordinator):
         if method in (NOTIFY_KLIPPY_DISCONNECTED, NOTIFY_KLIPPY_SHUTDOWN):
             reason = method.removeprefix("notify_klippy_")
             self.async_set_update_error(UpdateFailed(f"Klippy {reason}"))
+            return
+        if method == NOTIFY_GCODE_RESPONSE:
+            response = data[0] if isinstance(data, list) and data else data
+            if response is not None:
+                self.gcode_responses.append(str(response))
             return
         if method != NOTIFY_STATUS_UPDATE:
             return
