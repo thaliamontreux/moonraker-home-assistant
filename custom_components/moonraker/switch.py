@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 
-from .const import DOMAIN, METHODS, OBJ
+from .const import DOMAIN, METHODS
 from .entity import BaseMoonrakerEntity
 from custom_components.moonraker.__init__ import MoonrakerDataUpdateCoordinator
 
@@ -37,12 +37,9 @@ async def _power_device_updater(coordinator):
 async def async_setup_output_pin(coordinator, entry, async_add_entities):
     """Set optional binary sensor platform."""
 
-    object_list = await coordinator.async_fetch_data(METHODS.PRINTER_OBJECTS_LIST)
+    object_list = await coordinator.async_get_printer_objects()
 
-    query_obj = {OBJ: {"configfile": ["settings"]}}
-    settings = await coordinator.async_fetch_data(
-        METHODS.PRINTER_OBJECTS_QUERY, query_obj, quiet=True
-    )
+    settings = await coordinator.async_get_config_settings()
 
     switches = []
     for obj in object_list["objects"]:
@@ -62,7 +59,7 @@ async def async_setup_output_pin(coordinator, entry, async_add_entities):
         switches.append(desc)
 
     coordinator.load_sensor_data(switches)
-    await coordinator.async_refresh()
+    await coordinator.async_refresh_query_data()
     async_add_entities(
         [MoonrakerDigitalOutputPin(coordinator, entry, desc) for desc in switches]
     )
@@ -77,6 +74,7 @@ async def async_setup_power_device(coordinator, entry, async_add_entities):
     if power_devices.get("error"):
         return
 
+    coordinator.set_initial_data("power_devices", power_devices)
     coordinator.add_data_updater(_power_device_updater)
 
     sensors = []
@@ -91,7 +89,6 @@ async def async_setup_power_device(coordinator, entry, async_add_entities):
         sensors.append(desc)
 
     coordinator.load_sensor_data(sensors)
-    await coordinator.async_refresh()
     async_add_entities(
         [MoonrakerPowerDeviceSwitchSensor(coordinator, entry, desc) for desc in sensors]
     )
